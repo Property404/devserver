@@ -1,9 +1,12 @@
+use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sha1::{Digest, Sha1};
-use std::io::{Read, Write};
-use std::net::{IpAddr, TcpListener};
-use std::path::Path;
-use std::str;
-use std::thread;
+use std::{
+    io::{Read, Write},
+    net::{IpAddr, TcpListener},
+    path::Path,
+    str, thread,
+    time::Duration,
+};
 
 pub const RELOAD_PORT: u16 = 8129; /* Arbitrary port */
 
@@ -54,8 +57,6 @@ fn handle_websocket_handshake<T: Read + Write>(mut stream: T) {
 }
 
 pub fn watch_for_reloads(address: IpAddr, path: &Path) {
-    use notify::{DebouncedEvent::*, RecommendedWatcher, RecursiveMode, Watcher};
-
     // Setup websocket receiver.
     let listener = TcpListener::bind((address, RELOAD_PORT)).unwrap();
 
@@ -72,23 +73,19 @@ pub fn watch_for_reloads(address: IpAddr, path: &Path) {
                 // other than the initial handshake.
                 let (tx, rx) = std::sync::mpsc::channel();
                 /* Is a 10ms delay here too short?*/
-                let mut watcher: RecommendedWatcher =
-                    Watcher::new(tx, std::time::Duration::from_millis(10)).unwrap();
+                let watcher_config = Config::default().with_poll_interval(Duration::from_secs(10));
+                let mut watcher: RecommendedWatcher = Watcher::new(tx, watcher_config).unwrap();
                 watcher.watch(&path, RecursiveMode::Recursive).unwrap();
 
                 // Watch for file changes until the socket closes.
                 loop {
                     match rx.recv() {
-                        Ok(event) => {
+                        Ok(Ok(event)) => {
                             // Only refresh the web page for new and modified files
                             // For now do not refresh for removed or renamed files, but in the future
                             // it may be better to refresh then to immediately reflect path errors.
-                            let refresh = match event {
-                                NoticeWrite(..) | NoticeRemove(..) | Remove(..) | Rename(..)
-                                | Rescan => false,
-                                Create(..) | Write(..) | Chmod(..) => true,
-                                Error(..) => panic!(),
-                            };
+                            let refresh =
+                                matches!(event.kind, EventKind::Create(..) | EventKind::Modify(..));
 
                             if refresh {
                                 // A blank message is sent triggering a refresh on any file change.
@@ -98,6 +95,7 @@ pub fn watch_for_reloads(address: IpAddr, path: &Path) {
                                 };
                             }
                         }
+                        Ok(Err(e)) => println!("File watch error: {:?}", e),
                         Err(e) => println!("File watch error: {:?}", e),
                     };
                 }
