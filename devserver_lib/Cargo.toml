@@ -16,7 +16,7 @@ name = "devserver_lib"
 [dependencies]
 native-tls = {version = "0.2.11", optional = true}
 notify = {version = "6.1", optional = true}
-sha-1 = {version = "0.8.2", optional = true}
+sha-1 = {version = "0.10", optional = true}
 base64 = {version = "0.22", optional = true}
 
 [features]

@@ -30,8 +30,8 @@ fn parse_websocket_handshake(bytes: &[u8]) -> String {
         sec_websocket_key, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
     );
     let mut hasher = Sha1::new();
-    hasher.input(sec_websocket_accept.as_bytes());
-    let result = hasher.result();
+    hasher.update(sec_websocket_accept.as_bytes());
+    let result = hasher.finalize();
     let bytes = STD_BASE64.encode(result);
 
     format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {}\r\n\r\n",bytes)
