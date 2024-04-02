@@ -1,6 +1,3 @@
-extern crate base64;
-extern crate notify;
-
 use sha1::{Digest, Sha1};
 use std::io::{Read, Write};
 use std::net::{IpAddr, TcpListener};

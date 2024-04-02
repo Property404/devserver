@@ -2,7 +2,7 @@
 name = "devserver"
 version = "0.4.3"
 authors = ["Ian Kettlewell <ian.kettlewell@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "Zlib"
 repository = "https://github.com/kettle11/devserver"
 readme = "README.md"

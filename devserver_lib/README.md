@@ -9,8 +9,6 @@ devserver_lib does (nearly) the minimum necessary to serve a static folder over 
 
 ## usage
 ```rust
-extern crate devserver_lib;
-
 fn main() 
 {
   devserver_lib::run(&"localhost", 8080, "", /*Auto-reload:*/ true ); // Runs forever serving the current folder on http://localhost:8080
