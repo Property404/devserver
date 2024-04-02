@@ -10,7 +10,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io::BufRead;
 use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::net::{IpAddr, TcpListener};
 use std::path::Path;
 use std::str;
 use std::thread;
@@ -32,7 +32,12 @@ pub fn read_header<T: Read + Write>(stream: &mut T) -> Vec<u8> {
 }
 
 #[allow(unused)]
-fn handle_client<T: Read + Write>(mut stream: T, root_path: &str, reload: bool, headers: &str) {
+fn handle_client<T: Read + Write>(
+    mut stream: T,
+    root_path: impl AsRef<Path>,
+    reload: bool,
+    headers: &str,
+) {
     let buffer = read_header(&mut stream);
     let request_string = str::from_utf8(&buffer).unwrap();
 
@@ -55,13 +60,13 @@ fn handle_client<T: Read + Write>(mut stream: T, root_path: &str, reload: bool, 
     // Replace white space characters with proper whitespace and remove any paths that refer to the parent.
     let path = path.replace("../", "").replace("%20", " ");
     let path = if path.ends_with('/') {
-        Path::new(root_path).join(Path::new(&format!(
+        root_path.as_ref().join(Path::new(&format!(
             "{}{}",
             path.trim_start_matches('/'),
             "index.html"
         )))
     } else {
-        Path::new(root_path).join(path.trim_matches('/'))
+        root_path.as_ref().join(path.trim_matches('/'))
     };
 
     let extension = path.extension().and_then(OsStr::to_str);
@@ -125,7 +130,7 @@ fn handle_client<T: Read + Write>(mut stream: T, root_path: &str, reload: bool, 
     }
 }
 
-pub fn run(address: &str, port: u32, path: &str, reload: bool, headers: &str) {
+pub fn run(address: IpAddr, port: u16, path: impl AsRef<Path>, reload: bool, headers: &str) {
     #[cfg(feature = "https")]
     let acceptor = {
         // Hard coded certificate generated with the following commands:
@@ -140,21 +145,19 @@ pub fn run(address: &str, port: u32, path: &str, reload: bool, headers: &str) {
     #[cfg(feature = "reload")]
     {
         if reload {
-            let address = address.to_owned();
-            let path = path.to_owned();
+            let path = path.as_ref().to_owned();
             thread::spawn(move || {
-                reload::watch_for_reloads(&address, &path);
+                reload::watch_for_reloads(address, &path);
             });
         }
     }
 
-    let address_with_port = format!("{}:{:?}", address, port);
-    let listener = TcpListener::bind(address_with_port).unwrap();
+    let listener = TcpListener::bind((address, port)).unwrap();
     for stream in listener.incoming().flatten() {
         #[cfg(feature = "https")]
         let acceptor = acceptor.clone();
 
-        let path = path.to_owned();
+        let path = path.as_ref().to_owned();
         let headers = headers.to_owned();
         thread::spawn(move || {
             // HTTP requests always begin with a verb like 'GET'.

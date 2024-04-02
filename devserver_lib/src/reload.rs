@@ -3,15 +3,15 @@ extern crate notify;
 
 use sha1::{Digest, Sha1};
 use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::net::{IpAddr, TcpListener};
 use std::path::Path;
 use std::str;
 use std::thread;
 
-pub const RELOAD_PORT: u32 = 8129; /* Arbitrary port */
+pub const RELOAD_PORT: u16 = 8129; /* Arbitrary port */
 
 fn parse_websocket_handshake(bytes: &[u8]) -> String {
-    let request_string = str::from_utf8(&bytes).unwrap();
+    let request_string = str::from_utf8(bytes).unwrap();
     let lines = request_string.split("\r\n");
     let mut sec_websocket_key = "";
 
@@ -56,12 +56,11 @@ fn handle_websocket_handshake<T: Read + Write>(mut stream: T) {
     stream.flush().unwrap();
 }
 
-pub fn watch_for_reloads(address: &str, path: &str) {
+pub fn watch_for_reloads(address: IpAddr, path: &Path) {
     use notify::{DebouncedEvent::*, RecommendedWatcher, RecursiveMode, Watcher};
 
     // Setup websocket receiver.
-    let websocket_address = format!("{}:{:?}", address, RELOAD_PORT);
-    let listener = TcpListener::bind(websocket_address).unwrap();
+    let listener = TcpListener::bind((address, RELOAD_PORT)).unwrap();
 
     // The only incoming message we expect to receive is the initial handshake.
     for stream in listener.incoming() {
@@ -78,9 +77,7 @@ pub fn watch_for_reloads(address: &str, path: &str) {
                 /* Is a 10ms delay here too short?*/
                 let mut watcher: RecommendedWatcher =
                     Watcher::new(tx, std::time::Duration::from_millis(10)).unwrap();
-                watcher
-                    .watch(Path::new(&path), RecursiveMode::Recursive)
-                    .unwrap();
+                watcher.watch(&path, RecursiveMode::Recursive).unwrap();
 
                 // Watch for file changes until the socket closes.
                 loop {

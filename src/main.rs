@@ -1,22 +1,24 @@
-extern crate devserver_lib;
 use std::env;
-use std::path::Path;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
+use std::path::PathBuf;
 
 fn main() {
-    let args: Vec<String> = env::args().skip(1).collect();
-
-    let mut address: String = "localhost:8080".to_string();
-    let mut path: String = "".to_string();
+    let mut address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+    let mut path = PathBuf::new();
     let mut headers = "".to_string();
-    let mut args = args.iter();
     let mut reload = true;
+
+    let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_ref() {
             "--address" => {
                 address = args
                     .next()
                     .expect("Pass an address with a port after the '--address' flag")
-                    .to_string()
+                    .to_socket_addrs()
+                    .expect("Please give address and port in form of '127.0.0.1:8080'")
+                    .next()
+                    .unwrap()
             }
             "--reload" | "--refresh" => reload = true,
             "--noreload" | "--norefresh" => reload = false,
@@ -24,13 +26,12 @@ fn main() {
                 path = args
                     .next()
                     .expect("Pass a path after the '--path' flag")
-                    .to_string()
+                    .into()
             }
             "--header" => {
                 let mut new_header = args
                     .next()
-                    .expect("Pass a header after the '--header' flag")
-                    .to_string();
+                    .expect("Pass a header after the '--header' flag");
                 if !new_header.contains(':') {
                     if new_header.contains('=') {
                         new_header = new_header.replacen('=', ":", 1);
@@ -73,31 +74,18 @@ devserver --address 127.0.0.1:8080 --path "some_directory/subdirectory" --header
             }
         }
     }
-    let hosted_path = env::current_dir().unwrap().join(Path::new(&path));
+    let hosted_path = env::current_dir().unwrap().join(path);
 
-    if !std::path::Path::new(&hosted_path).exists() {
+    if !hosted_path.exists() {
         println!("Path [{}] does not exist!", hosted_path.display());
         return;
     }
 
-    let parts: Vec<&str> = address.split(':').collect();
-    let port = if let Some(port) = parts.get(1) {
-        let port = port.parse();
-        if let Ok(port) = port {
-            port
-        } else {
-            println!("Error: Port must be a number");
-            return;
-        }
-    } else {
-        8080
-    };
-
     println!(
         "\nServing [{}] at [ https://{} ] or [ http://{} ]",
         hosted_path.display(),
-        address,
-        address
+        address.ip(),
+        address.port()
     );
 
     if reload {
@@ -106,11 +94,5 @@ devserver --address 127.0.0.1:8080 --path "some_directory/subdirectory" --header
 
     println!("Stop with Ctrl+C");
 
-    devserver_lib::run(
-        parts[0],
-        port,
-        &hosted_path.to_string_lossy(),
-        reload,
-        &headers,
-    );
+    devserver_lib::run(address.ip(), address.port(), &hosted_path, reload, &headers);
 }
