@@ -1,11 +1,13 @@
 use base64::{engine::general_purpose::STANDARD as STD_BASE64, Engine as _};
-use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sha1::{Digest, Sha1};
 use std::{
     io::{Read, Write},
     net::{IpAddr, TcpListener},
     path::Path,
-    str, thread,
+    str,
+    sync::{Arc, Condvar, Mutex},
+    thread,
     time::Duration,
 };
 
@@ -61,43 +63,42 @@ pub fn watch_for_reloads(address: IpAddr, path: &Path) {
     // Setup websocket receiver.
     let listener = TcpListener::bind((address, RELOAD_PORT)).unwrap();
 
+    let pair = Arc::new((Mutex::new(()), Condvar::new()));
+
+    /* Is a 10ms delay here too short?*/
+    let watcher_config = Config::default().with_poll_interval(Duration::from_secs(10));
+    let mut watcher: RecommendedWatcher = {
+        let pair = pair.clone();
+        Watcher::new(
+            move |val: Result<Event, _>| match val {
+                Ok(event) => {
+                    if matches!(event.kind, EventKind::Create(..) | EventKind::Modify(..)) {
+                        let _m = pair.0.lock().expect("Poisoned lock");
+                        pair.1.notify_all();
+                    }
+                }
+                Err(e) => println!("File watch error: {:?}", e),
+            },
+            watcher_config,
+        )
+        .unwrap()
+    };
+    watcher.watch(path, RecursiveMode::Recursive).unwrap();
+
     // The only incoming message we expect to receive is the initial handshake.
     for stream in listener.incoming() {
-        let path = path.to_owned();
-
+        let pair = pair.clone();
         thread::spawn(move || {
             if let Ok(mut stream) = stream {
                 handle_websocket_handshake(&mut stream);
 
-                // We do not handle ping/pong requests. Is that bad?
-                // This code also assumes the client will never send any messages
-                // other than the initial handshake.
-                let (tx, rx) = std::sync::mpsc::channel();
-                /* Is a 10ms delay here too short?*/
-                let watcher_config = Config::default().with_poll_interval(Duration::from_secs(10));
-                let mut watcher: RecommendedWatcher = Watcher::new(tx, watcher_config).unwrap();
-                watcher.watch(&path, RecursiveMode::Recursive).unwrap();
-
                 // Watch for file changes until the socket closes.
                 loop {
-                    match rx.recv() {
-                        Ok(Ok(event)) => {
-                            // Only refresh the web page for new and modified files
-                            // For now do not refresh for removed or renamed files, but in the future
-                            // it may be better to refresh then to immediately reflect path errors.
-                            let refresh =
-                                matches!(event.kind, EventKind::Create(..) | EventKind::Modify(..));
-
-                            if refresh {
-                                // A blank message is sent triggering a refresh on any file change.
-                                // If this message fails to send, then likely the socket has been closed.
-                                if send_websocket_message(&stream).is_err() {
-                                    break;
-                                };
-                            }
-                        }
-                        Ok(Err(e)) => println!("File watch error: {:?}", e),
-                        Err(e) => println!("File watch error: {:?}", e),
+                    let _m = pair.1.wait(pair.0.lock().expect("poisoned lock")).unwrap();
+                    // A blank message is sent triggering a refresh on any file change.
+                    // If this message fails to send, then likely the socket has been closed.
+                    if send_websocket_message(&stream).is_err() {
+                        break;
                     };
                 }
             }
