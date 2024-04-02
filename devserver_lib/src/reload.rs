@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD as STD_BASE64, Engine as _};
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sha1::{Digest, Sha1};
 use std::{
@@ -31,7 +32,7 @@ fn parse_websocket_handshake(bytes: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.input(sec_websocket_accept.as_bytes());
     let result = hasher.result();
-    let bytes = base64::encode(&result);
+    let bytes = STD_BASE64.encode(result);
 
     format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {}\r\n\r\n",bytes)
 }
