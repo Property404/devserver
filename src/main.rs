@@ -1,12 +1,14 @@
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
+use std::process::Command;
 
 fn main() {
     let mut address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
     let mut path = PathBuf::new();
     let mut headers = "".to_string();
     let mut reload = true;
+    let mut actions = Vec::new();
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -19,6 +21,15 @@ fn main() {
                     .expect("Please give address and port in form of '127.0.0.1:8080'")
                     .next()
                     .unwrap()
+            }
+            "-b" | "--build" => {
+                let command = args.next().expect("--build expexted argument");
+                let func: Box<dyn Fn() + Send> = Box::new(move || {
+                    if let Err(e) = Command::new("sh").arg("-c").arg(&command).status() {
+                        eprintln!("Process error: {e}");
+                    }
+                });
+                actions.push(func);
             }
             "--reload" | "--refresh" => reload = true,
             "--noreload" | "--norefresh" => reload = false,
@@ -94,5 +105,12 @@ devserver --address 127.0.0.1:8080 --path "some_directory/subdirectory" --header
 
     println!("Stop with Ctrl+C");
 
-    devserver_lib::run(address.ip(), address.port(), &hosted_path, reload, &headers);
+    devserver_lib::run(
+        address.ip(),
+        address.port(),
+        &hosted_path,
+        reload,
+        &headers,
+        actions,
+    );
 }

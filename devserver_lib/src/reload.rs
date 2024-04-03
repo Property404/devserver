@@ -1,12 +1,12 @@
 use base64::{engine::general_purpose::STANDARD as STD_BASE64, Engine as _};
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{event::ModifyKind, Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use sha1::{Digest, Sha1};
 use std::{
     io::{Read, Write},
     net::{IpAddr, TcpListener},
     path::Path,
     str,
-    sync::{Arc, Condvar, Mutex},
+    sync::{mpsc, Arc, Condvar, Mutex},
     thread,
     time::Duration,
 };
@@ -59,31 +59,42 @@ fn handle_websocket_handshake<T: Read + Write>(mut stream: T) {
     stream.flush().unwrap();
 }
 
-pub fn watch_for_reloads(address: IpAddr, path: &Path) {
+pub fn watch_for_reloads(address: IpAddr, path: &Path, actions: Vec<Box<dyn Fn() + Send>>) {
     // Setup websocket receiver.
     let listener = TcpListener::bind((address, RELOAD_PORT)).unwrap();
 
+    let (tx, rx) = mpsc::channel();
     let pair = Arc::new((Mutex::new(()), Condvar::new()));
 
-    /* Is a 10ms delay here too short?*/
+    // Is a 10ms delay here too short?
     let watcher_config = Config::default().with_poll_interval(Duration::from_secs(10));
-    let mut watcher: RecommendedWatcher = {
-        let pair = pair.clone();
-        Watcher::new(
-            move |val: Result<Event, _>| match val {
+    let mut watcher: RecommendedWatcher = Watcher::new(tx, watcher_config).unwrap();
+    watcher.watch(path, RecursiveMode::Recursive).unwrap();
+
+    let pair2 = pair.clone();
+    thread::spawn(move || {
+        let pair = pair2;
+        while let Ok(event) = rx.recv() {
+            match event {
                 Ok(event) => {
-                    if matches!(event.kind, EventKind::Create(..) | EventKind::Modify(..)) {
+                    if matches!(event.kind, EventKind::Modify(ModifyKind::Data(..))) {
                         let _m = pair.0.lock().expect("Poisoned lock");
+
+                        for action in &actions {
+                            action();
+                        }
+
                         pair.1.notify_all();
+
+                        // Flush
+                        while rx.try_recv().is_ok() {}
                     }
                 }
                 Err(e) => println!("File watch error: {:?}", e),
-            },
-            watcher_config,
-        )
-        .unwrap()
-    };
-    watcher.watch(path, RecursiveMode::Recursive).unwrap();
+            }
+        }
+        todo!()
+    });
 
     // The only incoming message we expect to receive is the initial handshake.
     for stream in listener.incoming() {

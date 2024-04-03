@@ -131,7 +131,14 @@ fn handle_client<T: Read + Write>(
     }
 }
 
-pub fn run(address: IpAddr, port: u16, path: impl AsRef<Path>, reload: bool, headers: &str) {
+pub fn run(
+    address: IpAddr,
+    port: u16,
+    path: impl AsRef<Path>,
+    reload: bool,
+    headers: &str,
+    _actions: Vec<Box<dyn Fn() + Send>>,
+) {
     #[cfg(feature = "https")]
     let acceptor = {
         // Hard coded certificate generated with the following commands:
@@ -144,13 +151,11 @@ pub fn run(address: IpAddr, port: u16, path: impl AsRef<Path>, reload: bool, hea
     };
 
     #[cfg(feature = "reload")]
-    {
-        if reload {
-            let path = path.as_ref().to_owned();
-            thread::spawn(move || {
-                reload::watch_for_reloads(address, &path);
-            });
-        }
+    if reload {
+        let path = path.as_ref().to_owned();
+        thread::spawn(move || {
+            reload::watch_for_reloads(address, &path, _actions);
+        });
     }
 
     let listener = TcpListener::bind((address, port)).unwrap();
