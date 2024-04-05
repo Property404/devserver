@@ -105,7 +105,7 @@ devserver --address 127.0.0.1:8080 --path "some_directory/subdirectory" --header
 
     println!("Stop with Ctrl+C");
 
-    devserver_lib::run(
+    devserver::run(
         address.ip(),
         address.port(),
         &hosted_path,

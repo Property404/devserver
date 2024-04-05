@@ -2,7 +2,7 @@
 /// Simple and easy, but not robust or tested.
 
 #[cfg(feature = "https")]
-use native_tls::{Identity, TlsAcceptor, Protocol};
+use native_tls::{Identity, Protocol, TlsAcceptor};
 #[cfg(feature = "https")]
 use std::sync::Arc;
 
@@ -16,7 +16,6 @@ use std::str;
 use std::thread;
 
 mod mime;
-#[cfg(feature = "reload")]
 mod reload;
 
 pub fn read_header<T: Read + Write>(stream: &mut T) -> Vec<u8> {
@@ -95,13 +94,9 @@ fn handle_client<T: Read + Write>(
         let mut content_length = file_contents.len();
 
         // Prepare to inject code into HTML if reload is enabled.
-        #[cfg(feature = "reload")]
         let reload_append = include_bytes!("reload.html");
-        #[cfg(feature = "reload")]
-        {
-            if extension == Some("html") && reload {
-                content_length += reload_append.len();
-            }
+        if extension == Some("html") && reload {
+            content_length += reload_append.len();
         }
 
         let response = format!(
@@ -114,12 +109,9 @@ fn handle_client<T: Read + Write>(
         stream.write_all(&bytes).unwrap();
 
         // Inject code into HTML if reload is enabled
-        #[cfg(feature = "reload")]
-        {
-            if extension == Some("html") && reload {
-                // Insert javascript for reloading
-                stream.write_all(reload_append).unwrap();
-            }
+        if extension == Some("html") && reload {
+            // Insert javascript for reloading
+            stream.write_all(reload_append).unwrap();
         }
 
         stream.flush().unwrap();
@@ -147,16 +139,18 @@ pub fn run(
         // password for second command: 'debug'
         let bytes = include_bytes!("identity.pfx");
         let identity = Identity::from_pkcs12(bytes, "debug").unwrap();
-        Arc::new(TlsAcceptor::builder(identity)
-            .min_protocol_version(Some(Protocol::Tlsv12))
-            .build()
-            .unwrap())
+        Arc::new(
+            TlsAcceptor::builder(identity)
+                .min_protocol_version(Some(Protocol::Tlsv12))
+                .build()
+                .unwrap(),
+        )
     };
 
-    #[cfg(feature = "reload")]
-    if reload {
+    {
         let path = path.as_ref().to_owned();
         thread::spawn(move || {
+            let path = path.clone();
             reload::watch_for_reloads(address, &path, _actions);
         });
     }
