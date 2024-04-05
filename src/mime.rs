@@ -206,7 +206,7 @@ pub(crate) fn from_extension(extension: Option<&str>) -> &'static str {
         Some("jpe") => "image/jpeg",
         Some("jpeg") => "image/jpeg",
         Some("jpg") => "image/jpeg",
-        Some("js") => "application/javascript",
+        Some("js") => "text/javascript",
         Some("json") => "application/json",
         Some("jsx") => "text/jscript; charset=utf8",
         Some("jsxbin") => "text/plain; charset=utf8",
