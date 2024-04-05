@@ -2,7 +2,7 @@
 /// Simple and easy, but not robust or tested.
 
 #[cfg(feature = "https")]
-use native_tls::{Identity, TlsAcceptor};
+use native_tls::{Identity, TlsAcceptor, Protocol};
 #[cfg(feature = "https")]
 use std::sync::Arc;
 
@@ -147,7 +147,10 @@ pub fn run(
         // password for second command: 'debug'
         let bytes = include_bytes!("identity.pfx");
         let identity = Identity::from_pkcs12(bytes, "debug").unwrap();
-        Arc::new(TlsAcceptor::new(identity).unwrap())
+        Arc::new(TlsAcceptor::builder(identity)
+            .min_protocol_version(Some(Protocol::Tlsv12))
+            .build()
+            .unwrap())
     };
 
     #[cfg(feature = "reload")]
