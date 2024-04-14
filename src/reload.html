@@ -2,5 +2,16 @@
     // This code is inserted by devserver to enable reloading.
     const socket = new WebSocket("ws://" + window.location.hostname + ":8129");
     socket.addEventListener('open', function (event) { console.log("Reloading enabled!"); });
-    socket.addEventListener('message', function (event) { location.reload(); });
+    socket.addEventListener('message', function (event) {
+        if (event.data.length == 0) {
+            location.reload();
+        } else {
+            document.body.outerHTML = `<body>
+            <h1>ERROR</h1>
+            <pre>
+            ${event.data}
+            </pre>
+            </body>`;
+        }
+    });
 </script>

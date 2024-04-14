@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt::Display;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::Command;
@@ -23,11 +24,22 @@ fn main() {
                     .unwrap()
             }
             "-b" | "--build" => {
-                let command = args.next().expect("--build expexted argument");
-                let func: Box<dyn Fn() + Send> = Box::new(move || {
-                    if let Err(e) = Command::new("sh").arg("-c").arg(&command).status() {
-                        eprintln!("Process error: {e}");
+                let cmd = args.next().expect("--build expexted argument");
+                let func: devserver::Action = Box::new(move || {
+                    let mut command = Command::new("sh");
+                    let command = command.arg("-c").arg(&cmd);
+                    let output = command.output().map_err(|err| {
+                        let err: Box<dyn Display> = Box::new(err);
+                        err
+                    })?;
+                    let stdout = String::from_utf8(output.stdout).unwrap();
+                    print!("{stdout}");
+                    let stderr = String::from_utf8(output.stderr).unwrap();
+                    print!("{stderr}");
+                    if !output.status.success() {
+                        return Err(Box::new(format!("{stdout}{stderr}")));
                     }
+                    Ok(())
                 });
                 actions.push(func);
             }

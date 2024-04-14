@@ -40,14 +40,22 @@ fn parse_websocket_handshake(bytes: &[u8]) -> String {
 }
 
 // This function can send strings of text to a websocket stream.
-fn send_websocket_message<T: Write>(mut stream: T) -> Result<(), std::io::Error> {
-    let payload_length = 0;
+fn send_websocket_message<T: Write>(
+    mut stream: T,
+    message: Option<String>,
+) -> Result<(), std::io::Error> {
+    let payload_length = message.as_ref().map(|v| v.len()).unwrap_or(0);
 
-    stream.write_all(&[129])?; // Devserver always sends text messages. The combination of bitflags and opcode produces '129'
+    // Devserver always sends text messages. The combination of bitflags and opcode produces '129'
+    stream.write_all(&[129])?;
     let mut second_byte: u8 = 0;
 
     second_byte |= payload_length as u8;
     stream.write_all(&[second_byte])?;
+
+    if let Some(message) = message {
+        stream.write_all(message.as_bytes())?;
+    }
 
     Ok(())
 }
@@ -59,12 +67,12 @@ fn handle_websocket_handshake<T: Read + Write>(mut stream: T) {
     stream.flush().unwrap();
 }
 
-pub fn watch_for_reloads(address: IpAddr, path: &Path, actions: Vec<Box<dyn Fn() + Send>>) {
+pub fn watch_for_reloads(address: IpAddr, path: &Path, actions: Vec<crate::Action>) {
     // Setup websocket receiver.
     let listener = TcpListener::bind((address, RELOAD_PORT)).unwrap();
 
     let (tx, rx) = mpsc::channel();
-    let pair = Arc::new((Mutex::new(()), Condvar::new()));
+    let pair = Arc::new((Mutex::<Option<String>>::new(None), Condvar::new()));
 
     // Is a 10ms delay here too short?
     let watcher_config = Config::default().with_poll_interval(Duration::from_secs(10));
@@ -78,10 +86,14 @@ pub fn watch_for_reloads(address: IpAddr, path: &Path, actions: Vec<Box<dyn Fn()
             match event {
                 Ok(event) => {
                     if matches!(event.kind, EventKind::Modify(ModifyKind::Data(..))) {
-                        let _m = pair.0.lock().expect("Poisoned lock");
+                        let mut m = pair.0.lock().expect("Poisoned lock");
 
+                        *m = None;
                         for action in &actions {
-                            action();
+                            if let Err(err) = action() {
+                                *m = Some(format!("{err}"));
+                                break;
+                            }
                         }
 
                         pair.1.notify_all();
@@ -105,10 +117,10 @@ pub fn watch_for_reloads(address: IpAddr, path: &Path, actions: Vec<Box<dyn Fn()
 
                 // Watch for file changes until the socket closes.
                 loop {
-                    let _m = pair.1.wait(pair.0.lock().expect("poisoned lock")).unwrap();
+                    let m = pair.1.wait(pair.0.lock().expect("poisoned lock")).unwrap();
                     // A blank message is sent triggering a refresh on any file change.
                     // If this message fails to send, then likely the socket has been closed.
-                    if send_websocket_message(&stream).is_err() {
+                    if send_websocket_message(&stream, m.clone()).is_err() {
                         break;
                     };
                 }

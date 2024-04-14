@@ -7,6 +7,7 @@ use native_tls::{Identity, Protocol, TlsAcceptor};
 use std::sync::Arc;
 
 use std::ffi::OsStr;
+use std::fmt::Display;
 use std::fs;
 use std::io::BufRead;
 use std::io::{Read, Write};
@@ -17,6 +18,8 @@ use std::thread;
 
 mod mime;
 mod reload;
+
+pub type Action = Box<dyn Fn() -> Result<(), Box<dyn Display>> + Send>;
 
 pub fn read_header<T: Read + Write>(stream: &mut T) -> Vec<u8> {
     let mut buffer = Vec::new();
@@ -129,7 +132,7 @@ pub fn run(
     path: impl AsRef<Path>,
     reload: bool,
     headers: &str,
-    _actions: Vec<Box<dyn Fn() + Send>>,
+    actions: Vec<Action>,
 ) {
     #[cfg(feature = "https")]
     let acceptor = {
@@ -151,7 +154,7 @@ pub fn run(
         let path = path.as_ref().to_owned();
         thread::spawn(move || {
             let path = path.clone();
-            reload::watch_for_reloads(address, &path, _actions);
+            reload::watch_for_reloads(address, &path, actions);
         });
     }
 
