@@ -80,8 +80,8 @@ fn main() -> Result<()> {
     println!(
         "\nServing [{}] at [ https://{} ] or [ http://{} ]",
         hosted_path.display(),
-        args.address.ip(),
-        args.address.port()
+        args.address,
+        args.address
     );
 
     if !args.noreload {
