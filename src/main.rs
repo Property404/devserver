@@ -69,9 +69,7 @@ fn main() -> Result<()> {
         headers.push_str(&header?);
     }
 
-    let hosted_path = env::current_dir()
-        .unwrap()
-        .join(args.path.unwrap_or_default());
+    let hosted_path = env::current_dir()?.join(args.path.unwrap_or_default());
 
     if !hosted_path.exists() {
         bail!("Path [{}] does not exist!", hosted_path.display());
