@@ -127,6 +127,7 @@ pub fn run(
     address: IpAddr,
     port: u16,
     path: impl AsRef<Path>,
+    watch_path: impl AsRef<Path>,
     reload: bool,
     headers: &str,
     actions: Vec<Action>,
@@ -147,10 +148,10 @@ pub fn run(
     };
 
     {
-        let path = path.as_ref().to_owned();
+        let watch_path = watch_path.as_ref().to_owned();
         thread::spawn(move || {
-            let path = path.clone();
-            reload::watch_for_reloads(address, &path, actions);
+            let watch_path = watch_path.clone();
+            reload::watch_for_reloads(address, &watch_path, actions);
         });
     }
 

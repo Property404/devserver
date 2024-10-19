@@ -27,6 +27,9 @@ struct Arguments {
     /// Extra headers to serve
     #[clap(long)]
     header: Vec<String>,
+    /// Path to watch
+    #[clap(short = 'w', long = "watch")]
+    watch_path: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -70,10 +73,14 @@ fn main() -> Result<()> {
     }
 
     let hosted_path = env::current_dir()?.join(args.path.unwrap_or_default());
-
     if !hosted_path.exists() {
         bail!("Path [{}] does not exist!", hosted_path.display());
     }
+    let watch_path = if let Some(watch_path) = args.watch_path {
+        env::current_dir()?.join(watch_path)
+    } else {
+        hosted_path.clone()
+    };
 
     println!(
         "\nServing [{}] at [ https://{} ] or [ http://{} ]",
@@ -91,7 +98,8 @@ fn main() -> Result<()> {
     devserver::run(
         args.address.ip(),
         args.address.port(),
-        &hosted_path,
+        hosted_path,
+        watch_path,
         !args.noreload,
         &headers,
         actions,
