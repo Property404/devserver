@@ -24,7 +24,7 @@ fn main() {
                     .unwrap()
             }
             "-b" | "--build" => {
-                let cmd = args.next().expect("--build expexted argument");
+                let cmd = args.next().expect("--build expected argument");
                 let func: devserver::Action = Box::new(move || {
                     let mut command = Command::new("sh");
                     let command = command.arg("-c").arg(&cmd);
