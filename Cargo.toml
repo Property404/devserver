@@ -13,10 +13,12 @@ description = "A simple server for locally hosting a folder."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1"
+base64 = "0.22"
+clap = { version = "4.5.20", features = ["derive"] }
 native-tls = {version = "0.2.12", optional = true}
 notify = "6.1"
 sha-1 = "0.10"
-base64 = "0.22"
 
 [features]
 default = ["https"]
