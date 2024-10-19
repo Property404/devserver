@@ -1,9 +1,6 @@
 /// A local host only for serving static files.
 /// Simple and easy, but not robust or tested.
-
-#[cfg(feature = "https")]
 use native_tls::{Identity, Protocol, TlsAcceptor};
-#[cfg(feature = "https")]
 use std::sync::Arc;
 
 use std::ffi::OsStr;
@@ -134,7 +131,6 @@ pub fn run(
     headers: &str,
     actions: Vec<Action>,
 ) {
-    #[cfg(feature = "https")]
     let acceptor = {
         // Hard coded certificate generated with the following commands:
         // openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 36500 -nodes -subj "/"
@@ -160,7 +156,6 @@ pub fn run(
 
     let listener = TcpListener::bind((address, port)).unwrap();
     for stream in listener.incoming().flatten() {
-        #[cfg(feature = "https")]
         let acceptor = acceptor.clone();
 
         let path = path.as_ref().to_owned();
@@ -172,15 +167,10 @@ pub fn run(
             let mut buf = [0; 2];
             stream.peek(&mut buf).expect("peek failed");
 
-            #[cfg(feature = "https")]
             let is_https = !((buf[0] as char).is_alphabetic() && (buf[1] as char).is_alphabetic());
-
-            #[cfg(not(feature = "https"))]
-            let is_https = false;
 
             if is_https {
                 // acceptor.accept will block indefinitely if called with an HTTP stream.
-                #[cfg(feature = "https")]
                 if let Ok(stream) = acceptor.accept(stream) {
                     handle_client(stream, &path, reload, &headers);
                 }
