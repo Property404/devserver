@@ -20,4 +20,4 @@ base64 = "0.22"
 
 [features]
 default = ["https"]
-https = ["native-tls"]
+https = ["dep:native-tls"]
