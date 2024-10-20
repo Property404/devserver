@@ -31,7 +31,6 @@ pub fn read_header<T: Read + Write>(stream: &mut T) -> Vec<u8> {
     buffer
 }
 
-#[allow(unused)]
 fn handle_client<T: Read + Write>(
     mut stream: T,
     root_path: impl AsRef<Path>,
@@ -90,7 +89,6 @@ fn handle_client<T: Read + Write>(
         // Pair the file extension to a media (also known as MIME) type.
         let content_type = mime::from_extension(extension);
 
-        #[allow(unused_mut)]
         let mut content_length = file_contents.len();
 
         // Prepare to inject code into HTML if reload is enabled.
