@@ -1,21 +1,15 @@
-# devserver [![Crates.io](https://img.shields.io/crates/v/devserver.svg)](https://crates.io/crates/devserver)
+# devserver
 
-An extremely tiny tool to serve a static folder locally.
+Tool used to serve static files and reload when they change
 
-This tool is only for local development and makes no effort to be secure for
-other purposes.
+WARNING: **DO NOT USE THIS TOOL IN PRODUCTION - IT IS NOT SECURE**
 
-WARNING: **DO NOT USE DEVSERVER IN PRODUCTION**
-
-devserver should only be used for locally hosting files on a trusted network.
-
-devserver does not properly handle the attacks robust servers must withstand on
-an open network.
+Forked from [kettle11/devserver](https://github.com/kettle11/devserver)
 
 ## Installation
 
 ```
-cargo install devserver
+cargo install --git https://github.com/Property404/devserver
 ```
 
 ## Usage
