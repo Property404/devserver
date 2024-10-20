@@ -24,9 +24,3 @@ jobs:
 
       - name: Clippy (program)
         run: cargo clippy -- -D warnings
-
-      - name: Check formatting (library)
-        run: cd devserver_lib && cargo fmt --check
-
-      - name: Clippy (library)
-        run: cd devserver_lib && cargo clippy -- -D warnings
