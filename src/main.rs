@@ -2,40 +2,43 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use std::env;
 use std::fmt::Display;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr};
 
 use std::path::PathBuf;
 use std::process::Command;
 
-const DEFAULT_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+const DEFAULT_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+const DEFAULT_PORT: u16 = 8080;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Arguments {
-    /// Build command to run when source files change
+    /// Command to run when source files change
     #[clap(short, long)]
-    build: Option<String>,
+    command: Option<String>,
     /// Don't automatically reload
     #[clap(long)]
     noreload: bool,
-    /// The address/port
+    /// The port number
+    #[clap(short, long, default_value_t=DEFAULT_PORT)]
+    port: u16,
+    /// The ip address to bind to
     #[clap(short, long, default_value_t=DEFAULT_ADDR)]
-    address: SocketAddr,
-    /// The path to serve
-    #[clap(long)]
-    path: Option<PathBuf>,
+    bind: IpAddr,
     /// Extra headers to serve
     #[clap(long)]
     header: Vec<String>,
     /// Path to watch
     #[clap(short = 'w', long = "watch")]
     watch_path: Option<PathBuf>,
+    /// The path to serve
+    path: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
     let args = Arguments::parse();
     let mut actions = Vec::new();
-    if let Some(cmd) = args.build {
+    if let Some(cmd) = args.command {
         let func: devserver::Action = Box::new(move || {
             let mut command = Command::new("sh");
             let command = command.arg("-c").arg(&cmd);
@@ -83,10 +86,12 @@ fn main() -> Result<()> {
     };
 
     println!(
-        "\nServing [{}] at [ https://{} ] or [ http://{} ]",
+        "\nServing [{}] at [ https://{}:{} ] or [ http://{}:{} ]",
         hosted_path.display(),
-        args.address,
-        args.address
+        args.bind,
+        args.port,
+        args.bind,
+        args.port
     );
 
     if !args.noreload {
@@ -96,8 +101,8 @@ fn main() -> Result<()> {
     println!("Stop with Ctrl+C");
 
     devserver::run(
-        args.address.ip(),
-        args.address.port(),
+        args.bind,
+        args.port,
         hosted_path,
         watch_path,
         !args.noreload,
